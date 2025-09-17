@@ -6,6 +6,7 @@ import (
 	"grpc-demo/proto"
 	"io"
 	"log"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -23,7 +24,8 @@ func main() {
 	ctx := context.Background()
 
 	// doRequestResponse(ctx, serviceClient)
-	doServerStreaming(ctx, serviceClient)
+	// doServerStreaming(ctx, serviceClient)
+	doClientStreaming(ctx, serviceClient)
 }
 
 func doRequestResponse(ctx context.Context, serviceClient proto.DemoServiceClient) {
@@ -45,6 +47,7 @@ func doServerStreaming(ctx context.Context, serviceClient proto.DemoServiceClien
 		End:   100,
 	}
 	clientStream, err := serviceClient.GeneratePrimes(ctx, req)
+	time.Sleep(4 * time.Second)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -60,4 +63,30 @@ func doServerStreaming(ctx context.Context, serviceClient proto.DemoServiceClien
 		fmt.Printf("[client] Prime No : %d\n", res.GetPrimeNo())
 	}
 
+}
+
+func doClientStreaming(ctx context.Context, serviceClient proto.DemoServiceClient) {
+	nos := []int64{3, 1, 4, 2, 5, 9, 6, 8, 7}
+	clientStream, err := serviceClient.Aggregate(ctx)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	for _, no := range nos {
+		fmt.Println("Sending no :", no)
+		req := &proto.AggregateRequest{
+			No: no,
+		}
+		if err := clientStream.Send(req); err != nil {
+			log.Fatalln(err)
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+	fmt.Println("Client finished sending all the data")
+	if res, err := clientStream.CloseAndRecv(); err == io.EOF || err == nil {
+		fmt.Println("Sum :", res.GetSum())
+		fmt.Println("Min :", res.GetMin())
+		fmt.Println("Max :", res.GetMax())
+	} else {
+		log.Fatalln(err)
+	}
 }

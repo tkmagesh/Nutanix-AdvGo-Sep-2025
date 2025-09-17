@@ -27,6 +27,8 @@ type DemoServiceClient interface {
 	Add(ctx context.Context, in *AddRequest, opts ...grpc.CallOption) (*AddResponse, error)
 	// Server-Streaming
 	GeneratePrimes(ctx context.Context, in *PrimeRequest, opts ...grpc.CallOption) (DemoService_GeneratePrimesClient, error)
+	// Client Streaming
+	Aggregate(ctx context.Context, opts ...grpc.CallOption) (DemoService_AggregateClient, error)
 }
 
 type demoServiceClient struct {
@@ -78,6 +80,40 @@ func (x *demoServiceGeneratePrimesClient) Recv() (*PrimeResponse, error) {
 	return m, nil
 }
 
+func (c *demoServiceClient) Aggregate(ctx context.Context, opts ...grpc.CallOption) (DemoService_AggregateClient, error) {
+	stream, err := c.cc.NewStream(ctx, &DemoService_ServiceDesc.Streams[1], "/proto.DemoService/Aggregate", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &demoServiceAggregateClient{stream}
+	return x, nil
+}
+
+type DemoService_AggregateClient interface {
+	Send(*AggregateRequest) error
+	CloseAndRecv() (*AggregateResponse, error)
+	grpc.ClientStream
+}
+
+type demoServiceAggregateClient struct {
+	grpc.ClientStream
+}
+
+func (x *demoServiceAggregateClient) Send(m *AggregateRequest) error {
+	return x.ClientStream.SendMsg(m)
+}
+
+func (x *demoServiceAggregateClient) CloseAndRecv() (*AggregateResponse, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	m := new(AggregateResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // DemoServiceServer is the server API for DemoService service.
 // All implementations must embed UnimplementedDemoServiceServer
 // for forward compatibility
@@ -87,6 +123,8 @@ type DemoServiceServer interface {
 	Add(context.Context, *AddRequest) (*AddResponse, error)
 	// Server-Streaming
 	GeneratePrimes(*PrimeRequest, DemoService_GeneratePrimesServer) error
+	// Client Streaming
+	Aggregate(DemoService_AggregateServer) error
 	mustEmbedUnimplementedDemoServiceServer()
 }
 
@@ -99,6 +137,9 @@ func (UnimplementedDemoServiceServer) Add(context.Context, *AddRequest) (*AddRes
 }
 func (UnimplementedDemoServiceServer) GeneratePrimes(*PrimeRequest, DemoService_GeneratePrimesServer) error {
 	return status.Errorf(codes.Unimplemented, "method GeneratePrimes not implemented")
+}
+func (UnimplementedDemoServiceServer) Aggregate(DemoService_AggregateServer) error {
+	return status.Errorf(codes.Unimplemented, "method Aggregate not implemented")
 }
 func (UnimplementedDemoServiceServer) mustEmbedUnimplementedDemoServiceServer() {}
 
@@ -152,6 +193,32 @@ func (x *demoServiceGeneratePrimesServer) Send(m *PrimeResponse) error {
 	return x.ServerStream.SendMsg(m)
 }
 
+func _DemoService_Aggregate_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(DemoServiceServer).Aggregate(&demoServiceAggregateServer{stream})
+}
+
+type DemoService_AggregateServer interface {
+	SendAndClose(*AggregateResponse) error
+	Recv() (*AggregateRequest, error)
+	grpc.ServerStream
+}
+
+type demoServiceAggregateServer struct {
+	grpc.ServerStream
+}
+
+func (x *demoServiceAggregateServer) SendAndClose(m *AggregateResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *demoServiceAggregateServer) Recv() (*AggregateRequest, error) {
+	m := new(AggregateRequest)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // DemoService_ServiceDesc is the grpc.ServiceDesc for DemoService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -169,6 +236,11 @@ var DemoService_ServiceDesc = grpc.ServiceDesc{
 			StreamName:    "GeneratePrimes",
 			Handler:       _DemoService_GeneratePrimes_Handler,
 			ServerStreams: true,
+		},
+		{
+			StreamName:    "Aggregate",
+			Handler:       _DemoService_Aggregate_Handler,
+			ClientStreams: true,
 		},
 	},
 	Metadata: "proto/service.proto",

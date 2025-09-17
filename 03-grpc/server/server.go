@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"grpc-demo/proto"
+	"io"
 	"log"
 	"net"
 	"time"
@@ -54,6 +55,40 @@ func isPrime(no int64) bool {
 		}
 	}
 	return true
+}
+
+func (dsi *DemoServiceServerImpl) Aggregate(serverStream proto.DemoService_AggregateServer) error {
+	var sum, min, max int64 = 0, 9223372036854775807, -9223372036854775808
+LOOP:
+	for {
+		req, err := serverStream.Recv()
+		if err == io.EOF {
+			log.Println("[AppService - Aggregate] All the data have been received")
+			res := &proto.AggregateResponse{
+				Sum: sum,
+				Min: min,
+				Max: max,
+			}
+			if err := serverStream.SendAndClose(res); err != io.EOF && err != nil {
+				log.Fatalln(err)
+			}
+			break LOOP
+		}
+		if err != nil {
+			log.Fatalln(err)
+		}
+		fmt.Println(req)
+		time.Sleep(2 * time.Second)
+		no := req.GetNo()
+		sum += no
+		if no < min {
+			min = no
+		}
+		if no > max {
+			max = no
+		}
+	}
+	return nil
 }
 
 func main() {

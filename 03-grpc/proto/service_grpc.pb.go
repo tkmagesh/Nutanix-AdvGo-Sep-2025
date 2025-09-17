@@ -25,6 +25,8 @@ type DemoServiceClient interface {
 	// Operation contract(s)
 	// Request-Response
 	Add(ctx context.Context, in *AddRequest, opts ...grpc.CallOption) (*AddResponse, error)
+	// Server-Streaming
+	GeneratePrimes(ctx context.Context, in *PrimeRequest, opts ...grpc.CallOption) (DemoService_GeneratePrimesClient, error)
 }
 
 type demoServiceClient struct {
@@ -44,6 +46,38 @@ func (c *demoServiceClient) Add(ctx context.Context, in *AddRequest, opts ...grp
 	return out, nil
 }
 
+func (c *demoServiceClient) GeneratePrimes(ctx context.Context, in *PrimeRequest, opts ...grpc.CallOption) (DemoService_GeneratePrimesClient, error) {
+	stream, err := c.cc.NewStream(ctx, &DemoService_ServiceDesc.Streams[0], "/proto.DemoService/GeneratePrimes", opts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &demoServiceGeneratePrimesClient{stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+type DemoService_GeneratePrimesClient interface {
+	Recv() (*PrimeResponse, error)
+	grpc.ClientStream
+}
+
+type demoServiceGeneratePrimesClient struct {
+	grpc.ClientStream
+}
+
+func (x *demoServiceGeneratePrimesClient) Recv() (*PrimeResponse, error) {
+	m := new(PrimeResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
 // DemoServiceServer is the server API for DemoService service.
 // All implementations must embed UnimplementedDemoServiceServer
 // for forward compatibility
@@ -51,6 +85,8 @@ type DemoServiceServer interface {
 	// Operation contract(s)
 	// Request-Response
 	Add(context.Context, *AddRequest) (*AddResponse, error)
+	// Server-Streaming
+	GeneratePrimes(*PrimeRequest, DemoService_GeneratePrimesServer) error
 	mustEmbedUnimplementedDemoServiceServer()
 }
 
@@ -60,6 +96,9 @@ type UnimplementedDemoServiceServer struct {
 
 func (UnimplementedDemoServiceServer) Add(context.Context, *AddRequest) (*AddResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Add not implemented")
+}
+func (UnimplementedDemoServiceServer) GeneratePrimes(*PrimeRequest, DemoService_GeneratePrimesServer) error {
+	return status.Errorf(codes.Unimplemented, "method GeneratePrimes not implemented")
 }
 func (UnimplementedDemoServiceServer) mustEmbedUnimplementedDemoServiceServer() {}
 
@@ -92,6 +131,27 @@ func _DemoService_Add_Handler(srv interface{}, ctx context.Context, dec func(int
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DemoService_GeneratePrimes_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(PrimeRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(DemoServiceServer).GeneratePrimes(m, &demoServiceGeneratePrimesServer{stream})
+}
+
+type DemoService_GeneratePrimesServer interface {
+	Send(*PrimeResponse) error
+	grpc.ServerStream
+}
+
+type demoServiceGeneratePrimesServer struct {
+	grpc.ServerStream
+}
+
+func (x *demoServiceGeneratePrimesServer) Send(m *PrimeResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
 // DemoService_ServiceDesc is the grpc.ServiceDesc for DemoService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -104,6 +164,12 @@ var DemoService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _DemoService_Add_Handler,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "GeneratePrimes",
+			Handler:       _DemoService_GeneratePrimes_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "proto/service.proto",
 }

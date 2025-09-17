@@ -25,7 +25,8 @@ func main() {
 
 	// doRequestResponse(ctx, serviceClient)
 	// doServerStreaming(ctx, serviceClient)
-	doClientStreaming(ctx, serviceClient)
+	// doClientStreaming(ctx, serviceClient)
+	doBidirectionalStream(ctx, serviceClient)
 }
 
 func doRequestResponse(ctx context.Context, serviceClient proto.DemoServiceClient) {
@@ -88,5 +89,58 @@ func doClientStreaming(ctx context.Context, serviceClient proto.DemoServiceClien
 		fmt.Println("Max :", res.GetMax())
 	} else {
 		log.Fatalln(err)
+	}
+}
+
+func doBidirectionalStream(ctx context.Context, serviceClient proto.DemoServiceClient) {
+
+	clientStream, err := serviceClient.Greet(ctx)
+
+	if err != nil {
+		log.Fatalln(err)
+	}
+	go sendRequests(ctx, clientStream)
+	done := make(chan struct{})
+	go func() {
+		fmt.Println("Press ENTER to cancel")
+		fmt.Scanln()
+		clientStream.CloseSend()
+		close(done)
+	}()
+	go recvResponse(ctx, clientStream)
+	// return done
+	<-done
+}
+
+func sendRequests(ctx context.Context, clientStream proto.DemoService_GreetClient) {
+	persons := []*proto.PersonName{
+		{FirstName: "Magesh", LastName: "Kuppan"},
+		{FirstName: "Suresh", LastName: "Kannan"},
+		{FirstName: "Ramesh", LastName: "Jayaraman"},
+		{FirstName: "Rajesh", LastName: "Pandit"},
+		{FirstName: "Ganesh", LastName: "Kumar"},
+	}
+
+	// done := make(chan struct{})
+
+	for _, person := range persons {
+		req := &proto.GreetRequest{
+			Person: person,
+		}
+		log.Printf("Sending Person : %s %s\n", person.FirstName, person.LastName)
+		if err := clientStream.Send(req); err != nil {
+			log.Fatalln(err)
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+func recvResponse(ctx context.Context, clientStream proto.DemoService_GreetClient) {
+	for {
+		res, err := clientStream.Recv()
+		if err != nil {
+			log.Fatalln(err)
+		}
+		log.Println(res.GetMessage())
 	}
 }

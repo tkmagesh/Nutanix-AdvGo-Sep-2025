@@ -26,7 +26,8 @@ func main() {
 	// doRequestResponse(ctx, serviceClient)
 	// doServerStreaming(ctx, serviceClient)
 	// doClientStreaming(ctx, serviceClient)
-	doBidirectionalStream(ctx, serviceClient)
+	// doBidirectionalStream(ctx, serviceClient)
+	doRequestResponseWithTimeout(ctx, serviceClient)
 }
 
 func doRequestResponse(ctx context.Context, serviceClient proto.DemoServiceClient) {
@@ -35,6 +36,26 @@ func doRequestResponse(ctx context.Context, serviceClient proto.DemoServiceClien
 		Y: 200,
 	}
 	addRes, err := serviceClient.Add(ctx, addReq)
+	if err != nil {
+		fmt.Println("error :", err)
+		return
+	}
+	fmt.Printf("Add Result : %d\n", addRes.GetResult())
+}
+
+func doRequestResponseWithTimeout(ctx context.Context, serviceClient proto.DemoServiceClient) {
+	metadata := proto.ServiceMetadata{
+		Version: "1.0",
+	}
+	valCtx := context.WithValue(ctx, "svc-metadata", metadata)
+	timeoutCtx, cancel := context.WithTimeout(valCtx, 3*time.Second)
+	defer cancel()
+	addReq := &proto.AddRequest{
+		X: 100,
+		Y: 200,
+	}
+	addRes, err := serviceClient.Add(timeoutCtx, addReq)
+
 	if err != nil {
 		fmt.Println("error :", err)
 		return

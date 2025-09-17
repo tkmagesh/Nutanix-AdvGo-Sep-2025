@@ -37,8 +37,9 @@ func main() {
 		logCtx := context.WithValue(valCtx, "logger", logger)
 	*/
 	ctx := context.Background()
-	ctx = context.WithValue(ctx, "root-key", "root-value")
 	ctx = context.WithValue(ctx, "logger", logger)
+	ctx = context.WithValue(ctx, "root-key", "root-value")
+
 	ctx = stop(ctx)
 	ch := genNos(ctx)
 	for data := range ch {

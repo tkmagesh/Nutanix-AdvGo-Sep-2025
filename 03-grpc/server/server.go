@@ -19,10 +19,17 @@ type DemoServiceServerImpl struct {
 }
 
 func (dsi *DemoServiceServerImpl) Add(ctx context.Context, req *proto.AddRequest) (*proto.AddResponse, error) {
+	md := ctx.Value("svc-metadata")
+	fmt.Println(md)
 
 	x := req.GetX()
 	y := req.GetY()
 	log.Printf("[service] processing Add x = %d & y = %d\n", x, y)
+	time.Sleep(5 * time.Second)
+	if ctx.Err() != nil {
+		fmt.Println(ctx.Err())
+		return nil, nil
+	}
 	result := x + y
 	res := &proto.AddResponse{
 		Result: result,
